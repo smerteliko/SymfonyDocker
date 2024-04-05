@@ -1,0 +1,107 @@
+version: "3.8"
+
+services:
+  php-fpm:
+    container_name: ${COMPOSE_PROJECT_NAME}_php-fpm
+    build:
+      context: docker
+      dockerfile: ./php-fpm/Dockerfile
+    environment:
+      PHP_IDE_CONFIG: "serverName=Docker"
+    volumes:
+      - ./:/var/www/
+    networks:
+      - "NAME"
+    links:
+      - redis
+
+  nginx:
+    container_name: ${COMPOSE_PROJECT_NAME}_nginx
+    build:
+      context: docker/nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www:rw
+      - ./docker/php-fpm/php.ini:/etc/php/8.1/cli/php.ini
+    depends_on:
+      - php-fpm
+    networks:
+      - "NAME"
+
+  database:
+    image: 'mysql:latest'
+    container_name: ${COMPOSE_PROJECT_NAME}_database
+    volumes:
+      - ./docker/db/data:/var/lib/mysql
+      - ./docker/db/logs:/var/log/mysql
+      - ./docker/db:/etc/mysql/conf.d
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_BASE}
+    ports:
+      # To allow the host machine to access the ports below, modify the lines below.
+      # For example, to allow the host to connect to port 3306 on the container, you would change
+      # "3306" to "3306:3306". Where the first port is exposed to the host and the second is the container port.
+      # See https://docs.docker.com/compose/compose-file/compose-file-v3/#ports for more information.
+      - '3306:3306'
+    networks:
+      - "NAME"
+
+# If postgress
+#  database:
+#    image: 'postgres:alpine'
+#    container_name: ${COMPOSE_PROJECT_NAME}_database
+#    volumes:
+#      - ./docker/db:/var/lib/postgresql/data
+#    environment:
+#      POSTGRES_PASSWORD: ${DB_PASSWORD}
+#      POSTGRES_USER: ${DB_USERNAME}
+#      POSTGRES_DB: ${DB_BASE}
+#    ports:
+#      # To allow the host machine to access the ports below, modify the lines below.
+#      # For example, to allow the host to connect to port 3306 on the container, you would change
+#      # "3306" to "3306:3306". Where the first port is exposed to the host and the second is the container port.
+#      # See https://docs.docker.com/compose/compose-file/compose-file-v3/#ports for more information.
+#      - '54320'
+#    networks:
+#      - "NAME"
+
+
+  mailer:
+    image: maildev/maildev
+    container_name: ${COMPOSE_PROJECT_NAME}_mailer
+    ports:
+      - "1025"
+      - "1080"
+    networks:
+      - "NAME"
+
+  redis:
+    container_name: ${COMPOSE_PROJECT_NAME}_redis
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+
+  rabbitmq:
+    container_name: ${COMPOSE_PROJECT_NAME}_rabbit
+    hostname: rabbit
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - ./docker/rabbitmq/:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+networks:
+  "NAME":
+    driver: bridge
+
+volumes:
+  database:
