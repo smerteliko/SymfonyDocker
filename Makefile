@@ -5,7 +5,7 @@
   DOCKER_COMPOSE = docker compose -f ./docker-compose.yml
   DOCKER_COMPOSE_PHP_FPM_EXEC = ${DOCKER_COMPOSE} exec -u www-data php-fpm
 
-  SYMFONY       = $(DOCKER_COMPOSE_PHP_FPM_EXEC) bin/console
+  SYMFONY       = ${DOCKER_COMPOSE_PHP_FPM_EXEC} bin/console
 
   PHPUNIT       = ./vendor/bin/phpunit
   PHPSTAN       = ./vendor/bin/phpstan
@@ -36,6 +36,10 @@ dc_ps:
 
 dc_logs:
   ${DOCKER_COMPOSE} logs -f
+
+dc_kill:
+  ${DOCKER_COMPOSE} kill
+  ${DOCKER_COMPOSE} down --volumes --remove-orphans
 
 restart: dc_stop dc_start
 rebuild: dc_down dc_build dc_up
@@ -76,6 +80,9 @@ db_migration_down:
 db_drop:
   ${SYMFONY} doctrine:schema:drop --force
 
+db_up:
+  $(SYMFONY) doctrine:database:create --if-not-exists
+  $(SYMFONY) doctrine:schema:update --force
 
 ##################
 # Cache
@@ -94,3 +101,33 @@ cache_fix_perm:
 cache_purge:
   @rm -rf var/cache/* var/logs/*
 
+
+##################
+# Code quality
+##################
+stan:
+	@${SYMFONY} analyse -c configuration/phpstan.neon --memory-limit 1G
+
+php-cs-fixer:
+	${DOCKER_COMPOSE_PHP_FPM_EXEC} php-cs-fixer fix --allow-risky=yes --dry-run --diff --verbose
+
+php-cs-fixer-fix:
+	${DOCKER_COMPOSE_PHP_FPM_EXEC} php-cs-fixer fix --allow-risky=yes --verbose
+
+psalm:
+	${DOCKER_COMPOSE_PHP_FPM_EXEC} psalm
+
+dephpend:
+	${DOCKER_COMPOSE_PHP_FPM_EXEC} bin/dephpend
+
+phpmd:
+	${DOCKER_COMPOSE_PHP_FPM_EXEC} phpmd src json phpmd.xml
+
+composer-validate:
+	${DOCKER_COMPOSE_PHP_FPM_EXEC} validate
+
+composer-require-checker:
+	${DOCKER_COMPOSE_PHP_FPM_EXEC} composer-require-checker check
+
+lint-yaml:
+	${SYMFONY} lint:yaml config --parse-tags
